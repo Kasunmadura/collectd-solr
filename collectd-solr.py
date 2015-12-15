@@ -7,10 +7,6 @@ import collectd
 import requests, socket
 
 
-SOLR_HOST = 'localhost'
-SOLR_PORT = 8983
-SOLR_STATUS = 'OVERSEERSTATUS'
-SOLR_INTERVAL = 1
 VERBOSE_LOGGING = True
 
 
@@ -18,7 +14,7 @@ VERBOSE_LOGGING = True
 def log_verbose(msg):
     if not VERBOSE_LOGGING:
         return
-    collectd.info('solr_info plugin [verbose]: %s' % msg)
+    collectd.info('solr_info plugin [verbose]: {}'.format(msg))
 
 
 class Solr(object):
@@ -28,15 +24,15 @@ class Solr(object):
         self.status = status
 
 
-    def get_status(self, host=SOLR_HOST, port=SOLR_PORT, status=SOLR_STATUS):
+    def get_status(self):
         """Execute to Solr status command and return JSON object"""
-        url = 'http://{}:{}/solr/admin/collections?action={}&wt=json'.format(SOLR_HOST, SOLR_PORT, SOLR_STATUS)
+        url = 'http://{}:{}/solr/admin/collections?action={}&wt=json'.format(self.host, self.port, self.status)
         try:
             r = requests.get(url)
             if r.status_code == 200:
                 reply = r.json()
         except Exception as e:
-            log_verbose('collectd-solr plugin: can\'t get {} info, with error message {}'.format(status, e.message))
+            log_verbose('collectd-solr plugin: can\'t get {} info, with error message {}'.format(self.status, e.message))
         return reply
 
 
@@ -56,21 +52,27 @@ class Solr(object):
 
 
 class SolrPlugin(object):
+    def __init__(self):
+        self.SOLR_HOST = 'localhost'
+        self.SOLR_PORT = 8983
+        self.SOLR_STATUS = 'OVERSEERSTATUS'
+        self.SOLR_INTERVAL = 1
+
+
     def configure_callback(self, conf):
         """Receive configuration block"""
-        global SOLR_HOST, SOLR_PORT, SOLR_STATUS
         for node in conf.children:
             if node.key == 'Host':
-                SOLR_HOST = node.values[0]
+                self.SOLR_HOST = node.values[0]
             elif node.key == 'Port':
-                SOLR_PORT = int(node.values[0])
+                self.SOLR_PORT = int(node.values[0])
             elif node.key == 'Status':
-                SOLR_STATUS = node.values[0]
+                self.SOLR_STATUS = node.values[0]
             elif node.key == 'Interval':
-                SOLR_INTERVAL = int(float(node.values[0]))
+                self.SOLR_INTERVAL = int(float(node.values[0]))
             else:
                 collectd.warning('collectd-solr plugin: Unknown config key: {}.'.format(node.key))
-        log_verbose('Configured: host={}, port={}, status={}, interval={}'.format(SOLR_HOST, SOLR_PORT, SOLR_STATUS, SOLR_INTERVAL))
+        log_verbose('Configured: host={}, port={}, status={}, interval={}'.format(self.SOLR_HOST, self.SOLR_PORT, self.SOLR_STATUS, self.SOLR_INTERVAL))
 
 
     def dispatch_value(self, instance, value, value_type):
@@ -83,7 +85,7 @@ class SolrPlugin(object):
 
     def read_callback(self):
         log_verbose('solr-info plugin: Read callback called')
-        solr = Solr(SOLR_HOST, SOLR_PORT, SOLR_STATUS)
+        solr = Solr(self.SOLR_HOST, self.SOLR_PORT, self.SOLR_STATUS)
         self.dispatch_value('leader', solr.get_leader(), 'gauge')
         self.dispatch_value('overseer_queue_size', solr.get_overseer_queue_size(), 'gauge')
         self.dispatch_value('overseer_work_queue_size', solr.get_overseer_collection_queue_size(), 'gauge')
@@ -93,4 +95,4 @@ class SolrPlugin(object):
 # register callbacks
 plugin = SolrPlugin()
 collectd.register_config(plugin.configure_callback)
-collectd.register_read(plugin.read_callback, SOLR_INTERVAL)
+collectd.register_read(plugin.read_callback, plugin.SOLR_INTERVAL)
