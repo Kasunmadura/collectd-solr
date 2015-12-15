@@ -14,7 +14,7 @@ VERBOSE_LOGGING = True
 def log_verbose(msg):
     if not VERBOSE_LOGGING:
         return
-    collectd.info('solr_info plugin [verbose]: {}'.format(msg))
+    collectd.info('Collectd-Solr Plugin: {}'.format(msg))
 
 
 class Solr(object):
@@ -57,6 +57,7 @@ class SolrPlugin(object):
         self.SOLR_PORT = 8983
         self.SOLR_STATUS = 'OVERSEERSTATUS'
         self.SOLR_INTERVAL = 1
+        self.SOLR_INSTANCE = ""
 
 
     def configure_callback(self, conf):
@@ -70,26 +71,29 @@ class SolrPlugin(object):
                 self.SOLR_STATUS = node.values[0]
             elif node.key == 'Interval':
                 self.SOLR_INTERVAL = int(float(node.values[0]))
+            elif node.key == 'Instance':
+                self.SOLR_INSTANCE = node.values[0]
             else:
                 collectd.warning('collectd-solr plugin: Unknown config key: {}.'.format(node.key))
-        log_verbose('Configured: host={}, port={}, status={}, interval={}'.format(self.SOLR_HOST, self.SOLR_PORT, self.SOLR_STATUS, self.SOLR_INTERVAL))
+        log_verbose('Configured: host={}, port={}, status={}, interval={}, instance={}'.format(self.SOLR_HOST, self.SOLR_PORT, self.SOLR_STATUS, self.SOLR_INTERVAL, self.SOLR_INSTANCE))
 
 
-    def dispatch_value(self, instance, value, value_type):
+    def dispatch_value(self, type_instance, value, value_type, plugin_instance):
         val = collectd.Values(plugin='solr')
-        val.plugin_instance = instance
+        val.type_instance = type_instance
         val.type = value_type
         val.values = [value]
+        val.plugin_instance = plugin_instance
         val.dispatch()
 
 
     def read_callback(self):
-        log_verbose('solr-info plugin: Read callback called')
+        log_verbose('Read Callback Called')
         solr = Solr(self.SOLR_HOST, self.SOLR_PORT, self.SOLR_STATUS)
-        self.dispatch_value('leader', solr.get_leader(), 'gauge')
-        self.dispatch_value('overseer_queue_size', solr.get_overseer_queue_size(), 'gauge')
-        self.dispatch_value('overseer_work_queue_size', solr.get_overseer_collection_queue_size(), 'gauge')
-        self.dispatch_value('overseer_collection_queue_size', solr.get_overseer_collection_queue_size(), 'gauge')
+        self.dispatch_value('leader', solr.get_leader(), 'gauge', self.SOLR_INSTANCE)
+        self.dispatch_value('overseer_queue_size', solr.get_overseer_queue_size(), 'gauge', self.SOLR_INSTANCE)
+        self.dispatch_value('overseer_work_queue_size', solr.get_overseer_collection_queue_size(), 'gauge', self.SOLR_INSTANCE)
+        self.dispatch_value('overseer_collection_queue_size', solr.get_overseer_collection_queue_size(), 'gauge', self.SOLR_INSTANCE)
 
 
 # register callbacks
